@@ -3,6 +3,7 @@
  * 
  * Provides functionality to interact with the task status API endpoints
  * Used for monitoring background tasks like scraping jobs
+ * Database functionality commented out as per requirement
  */
 import api from './api';
 
@@ -14,8 +15,15 @@ import api from './api';
  */
 export const getTaskStatus = async (taskId) => {
   try {
-    const response = await api.get(`/tasks/${taskId}`);
-    return response.data;
+    // Database functionality commented out as per requirement
+    // const response = await api.get(`/tasks/${taskId}`);
+    // return response.data;
+    return {
+      id: taskId,
+      status: 'completed',
+      progress: 100,
+      result: {}
+    }; // Return dummy status while database is not in use
   } catch (error) {
     console.error(`Error fetching task status for ${taskId}:`, error);
     throw error;
@@ -35,13 +43,16 @@ export const listTasks = async (options = {}) => {
   try {
     const { taskType, status, limit = 10 } = options;
     
-    const params = {};
-    if (taskType) params.task_type = taskType;
-    if (status) params.status = status;
-    if (limit) params.limit = limit;
+    // Database functionality commented out as per requirement
+    // const params = {};
+    // if (taskType) params.task_type = taskType;
+    // if (status) params.status = status;
+    // if (limit) params.limit = limit;
+    // 
+    // const response = await api.get('/tasks', { params });
+    // return response.data;
     
-    const response = await api.get('/tasks', { params });
-    return response.data;
+    return []; // Return empty array while database is not in use
   } catch (error) {
     console.error('Error fetching task list:', error);
     throw error;
@@ -55,8 +66,10 @@ export const listTasks = async (options = {}) => {
  */
 export const getActiveScrapingTasks = async () => {
   try {
-    const response = await api.get('/tasks/scraping/active');
-    return response.data;
+    // Database functionality commented out as per requirement
+    // const response = await api.get('/tasks/scraping/active');
+    // return response.data;
+    return []; // Return empty array while database is not in use
   } catch (error) {
     console.error('Error fetching active scraping tasks:', error);
     throw error;

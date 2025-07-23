@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   Box,
@@ -9,7 +9,6 @@ import {
   CardMedia,
   Typography,
   FormControl,
-  InputLabel,
   Select,
   MenuItem,
   Slider,
@@ -23,127 +22,23 @@ import {
   Chip,
   Divider,
   Paper,
-  Rating
+  Rating,
+  CircularProgress
 } from '@mui/material';
 import {
   Search as SearchIcon,
   Favorite as FavoriteIcon,
   FavoriteBorder as FavoriteBorderIcon,
   CompareArrows as CompareArrowsIcon,
-  FilterAlt as FilterAltIcon
+  FilterAlt as FilterAltIcon,
+  Launch as LaunchIcon
 } from '@mui/icons-material';
+import productService from '../services/productService';
 
-// Sample product data (will be replaced with API calls)
-const sampleProducts = [
-  {
-    id: 1,
-    name: 'Premium Cotton Boxer',
-    image: 'https://via.placeholder.com/300x300?text=Product+1',
-    brand: 'BrandX',
-    price: 599,
-    originalPrice: 799,
-    source: 'Amazon',
-    gender: 'men',
-    rating: 4.5,
-    reviews: 128,
-    type: 'Boxer'
-  },
-  {
-    id: 2,
-    name: 'Soft Touch Brief Pack',
-    image: 'https://via.placeholder.com/300x300?text=Product+2',
-    brand: 'ComfortPlus',
-    price: 499,
-    originalPrice: 599,
-    source: 'Flipkart',
-    gender: 'men',
-    rating: 4.2,
-    reviews: 87,
-    type: 'Brief'
-  },
-  {
-    id: 3,
-    name: 'Seamless Hipster',
-    image: 'https://via.placeholder.com/300x300?text=Product+3',
-    brand: 'Elanica',
-    price: 799,
-    originalPrice: 999,
-    source: 'Myntra',
-    gender: 'women',
-    rating: 4.7,
-    reviews: 154,
-    type: 'Hipster'
-  },
-  {
-    id: 4,
-    name: 'Sports Underwear',
-    image: 'https://via.placeholder.com/300x300?text=Product+4',
-    brand: 'ActiveWear',
-    price: 899,
-    originalPrice: 1099,
-    source: 'Ajio',
-    gender: 'men',
-    rating: 4.8,
-    reviews: 92,
-    type: 'Sports'
-  },
-  {
-    id: 5,
-    name: 'Cotton Bikini Pack',
-    image: 'https://via.placeholder.com/300x300?text=Product+5',
-    brand: 'LadyComfort',
-    price: 699,
-    originalPrice: 899,
-    source: 'Amazon',
-    gender: 'women',
-    rating: 4.3,
-    reviews: 67,
-    type: 'Bikini'
-  },
-  {
-    id: 6,
-    name: 'Bamboo Fiber Trunk',
-    image: 'https://via.placeholder.com/300x300?text=Product+6',
-    brand: 'EcoWear',
-    price: 799,
-    originalPrice: 999,
-    source: 'Myntra',
-    gender: 'men',
-    rating: 4.6,
-    reviews: 41,
-    type: 'Trunk'
-  },
-  {
-    id: 7,
-    name: 'Modal Thong',
-    image: 'https://via.placeholder.com/300x300?text=Product+7',
-    brand: 'Sleekfit',
-    price: 499,
-    originalPrice: 599,
-    source: 'Ajio',
-    gender: 'women',
-    rating: 4.4,
-    reviews: 38,
-    type: 'Thong'
-  },
-  {
-    id: 8,
-    name: 'Organic Cotton Briefs',
-    image: 'https://via.placeholder.com/300x300?text=Product+8',
-    brand: 'GreenBasics',
-    price: 599,
-    originalPrice: 699,
-    source: 'Flipkart',
-    gender: 'men',
-    rating: 4.2,
-    reviews: 76,
-    type: 'Brief'
-  }
-];
+// No static product data - all data is fetched from APIs
 
-const brands = ['BrandX', 'ComfortPlus', 'Elanica', 'ActiveWear', 'LadyComfort', 'EcoWear', 'Sleekfit', 'GreenBasics'];
-const sources = ['Amazon', 'Flipkart', 'Myntra', 'Ajio'];
-const types = ['Boxer', 'Brief', 'Hipster', 'Sports', 'Bikini', 'Trunk', 'Thong'];
+// Dynamic lists will be populated from API data
+const sources = ['Amazon']; // Only Amazon source is active per requirements
 
 const ProductsPage = () => {
   const location = useLocation();
@@ -163,12 +58,48 @@ const ProductsPage = () => {
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [favorites, setFavorites] = useState([]);
   const [compareList, setCompareList] = useState([]);
+  const [amazonProducts, setAmazonProducts] = useState([]);
+  const [amazonSearchTerm, setAmazonSearchTerm] = useState('inners');
+  const [isLoadingAmazon, setIsLoadingAmazon] = useState(false);
+  
+  // Fetch products from Amazon
+  const fetchAmazonProducts = useCallback(async () => {
+    try {
+      setIsLoadingAmazon(true);
+      const data = await productService.getAmazonProducts(amazonSearchTerm, gender !== 'all' ? gender : undefined);
+      console.log('Amazon products before setting state:', data);
+      console.log('Amazon products array type:', Array.isArray(data) ? 'Is Array' : 'Not Array');
+      console.log('Amazon products length:', data ? data.length : 'null/undefined');
+      
+      setAmazonProducts(Array.isArray(data) ? data : []);
+      console.log('Amazon products after setting state:', amazonProducts);
+    } catch (error) {
+      console.error('Error fetching Amazon products:', error);
+      setAmazonProducts([]);
+    } finally {
+      setIsLoadingAmazon(false);
+    }
+  }, [amazonSearchTerm, gender]);
   
   // Load initial data
   useEffect(() => {
-    // This would be replaced with an API call in a real application
-    setProducts(sampleProducts);
-  }, []);
+    // Initialize with empty array since database functionality is not in use as per requirement
+    setProducts([]);
+    
+    // Fetch Amazon products on page load
+    fetchAmazonProducts();
+  }, [fetchAmazonProducts]);
+  
+  // Handle Amazon search term change
+  const handleAmazonSearchChange = (event) => {
+    setAmazonSearchTerm(event.target.value);
+  };
+  
+  // Handle Amazon search submit
+  const handleAmazonSearchSubmit = (event) => {
+    event.preventDefault();
+    fetchAmazonProducts();
+  };
 
   // Apply filters
   useEffect(() => {
@@ -334,40 +265,16 @@ const ProductsPage = () => {
             {/* Brand Filter */}
             <Box sx={{ mb: 3 }}>
               <Typography variant="subtitle1" gutterBottom>Brand</Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                {brands.map((brand) => (
-                  <FormControlLabel
-                    key={brand}
-                    control={
-                      <Checkbox 
-                        checked={selectedBrands.includes(brand)}
-                        onChange={() => handleBrandChange(brand)}
-                        size="small"
-                      />
-                    }
-                    label={brand}
-                  />
-                ))}
+              <Box sx={{ display: 'flex', flexDirection: 'column', color: 'text.secondary' }}>
+                <Typography variant="body2">Brands will appear when products are loaded</Typography>
               </Box>
             </Box>
             
             {/* Type Filter */}
             <Box sx={{ mb: 3 }}>
               <Typography variant="subtitle1" gutterBottom>Type</Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                {types.map((type) => (
-                  <FormControlLabel
-                    key={type}
-                    control={
-                      <Checkbox 
-                        checked={selectedTypes.includes(type)}
-                        onChange={() => handleTypeChange(type)}
-                        size="small"
-                      />
-                    }
-                    label={type}
-                  />
-                ))}
+              <Box sx={{ display: 'flex', flexDirection: 'column', color: 'text.secondary' }}>
+                <Typography variant="body2">Product types will appear when products are loaded</Typography>
               </Box>
             </Box>
             
@@ -407,6 +314,187 @@ const ProductsPage = () => {
           </Paper>
         </Grid>
         
+        {/* Main Content */}
+        <Grid item xs={12} md={9}>
+          {/* Amazon Products Section */}
+          <Paper sx={{ p: 3, mb: 3 }}>
+            <Typography variant="h5" component="h2" gutterBottom>
+              Amazon Products - Inners
+            </Typography>
+            
+            {/* Amazon Search Form */}
+            <Box component="form" onSubmit={handleAmazonSearchSubmit} sx={{ mb: 3, display: 'flex', gap: 1 }}>
+              <TextField
+                label="Search Amazon"
+                value={amazonSearchTerm}
+                onChange={handleAmazonSearchChange}
+                variant="outlined"
+                size="small"
+                sx={{ flexGrow: 1 }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <SearchIcon color="primary" />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              <Button 
+                type="submit" 
+                variant="contained" 
+                color="primary"
+                disabled={isLoadingAmazon}
+              >
+                Search
+              </Button>
+            </Box>
+            
+            {isLoadingAmazon ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : amazonProducts.length > 0 ? (
+              <Grid container spacing={2}>
+                {amazonProducts.map((product, index) => (
+                  <Grid item xs={12} sm={6} md={4} lg={3} key={`amazon-${product.id || index}`}>
+                    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+                      <Box sx={{ position: 'relative' }}>
+                        <CardMedia
+                          component="img"
+                          height="200"
+                          image={product.image && product.image !== '' ? product.image : `https://via.placeholder.com/300x300/cccccc/333333?text=${encodeURIComponent('Product')}`}
+                          alt={product.name || 'Product'}
+                        />
+                        {/* Favorite and Compare buttons */}
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            top: 0,
+                            right: 0,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            p: 1,
+                          }}
+                        >
+                          <IconButton
+                            onClick={() => handleToggleFavorite(product.id)}
+                            sx={{
+                              bgcolor: 'rgba(255,255,255,0.7)',
+                              mb: 1,
+                              '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' },
+                            }}
+                            size="small"
+                          >
+                            {favorites.includes(product.id) ? (
+                              <FavoriteIcon color="error" />
+                            ) : (
+                              <FavoriteBorderIcon />
+                            )}
+                          </IconButton>
+                          <IconButton
+                            onClick={() => handleToggleCompare(product.id)}
+                            sx={{
+                              bgcolor: 'rgba(255,255,255,0.7)',
+                              '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' },
+                            }}
+                            size="small"
+                          >
+                            <CompareArrowsIcon color={compareList.includes(product.id) ? 'primary' : 'inherit'} />
+                          </IconButton>
+                        </Box>
+                        <Box
+                          sx={{
+                            position: 'absolute',
+                            bottom: 0,
+                            left: 0,
+                            width: '100%',
+                            bgcolor: 'rgba(0, 0, 0, 0.54)',
+                            color: 'white',
+                            padding: '5px 10px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}
+                        >
+                          <Typography variant="caption">
+                            via {product.source}
+                          </Typography>
+                          <IconButton
+                            href={product.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            size="small"
+                            sx={{ color: 'white' }}
+                            aria-label="Go to Amazon"
+                          >
+                            <LaunchIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </Box>
+                      <CardContent sx={{ flexGrow: 1 }}>
+                        <Typography gutterBottom variant="h6" component="h3">
+                          {product.name}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                          {product.brand} • {product.type || 'Innerwear'}
+                        </Typography>
+                        {product.rating > 0 && (
+                          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                            <Rating value={product.rating} precision={0.1} size="small" readOnly />
+                            <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                              ({product.reviews_count || 0})
+                            </Typography>
+                          </Box>
+                        )}
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Typography variant="h6" color="primary" sx={{ mr: 1 }}>
+                            ₹{product.price}
+                          </Typography>
+                          {product.original_price > 0 && product.original_price > product.price && (
+                            <>
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{ textDecoration: 'line-through', mr: 1 }}
+                              >
+                                ₹{product.original_price}
+                              </Typography>
+                              <Typography variant="body2" color="error">
+                                {Math.round((1 - product.price / product.original_price) * 100)}% off
+                              </Typography>
+                            </>
+                          )}
+                        </Box>
+                      </CardContent>
+                      <Divider />
+                      <Box sx={{ p: 1 }}>
+                        <Button 
+                          variant="outlined" 
+                          fullWidth
+                          size="small"
+                          href={product.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          startIcon={<LaunchIcon />}
+                        >
+                          View on Amazon
+                        </Button>
+                      </Box>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            ) : (
+              <Paper sx={{ p: 4, textAlign: 'center' }}>
+                <Typography variant="body1">No Amazon products found</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Try changing your search term or try again later
+                </Typography>
+              </Paper>
+            )}
+          </Paper>
+        </Grid>
+
         {/* Products Grid */}
         <Grid item xs={12} md={9}>
           <Box sx={{ mb: 3 }}>
