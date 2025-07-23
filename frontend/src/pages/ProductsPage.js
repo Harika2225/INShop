@@ -59,27 +59,31 @@ const ProductsPage = () => {
   const [favorites, setFavorites] = useState([]);
   const [compareList, setCompareList] = useState([]);
   const [amazonProducts, setAmazonProducts] = useState([]);
-  const [amazonSearchTerm, setAmazonSearchTerm] = useState('inners');
   const [isLoadingAmazon, setIsLoadingAmazon] = useState(false);
+  const amazonDirectUrl = 'https://www.amazon.in/s?i=apparel&rh=n%3A1968126031&s=popularity-rank&fs=true'; // Default to using the direct URL
+  const [amazonPage, setAmazonPage] = useState(1);
   
   // Fetch products from Amazon
   const fetchAmazonProducts = useCallback(async () => {
     try {
       setIsLoadingAmazon(true);
-      const data = await productService.getAmazonProducts(amazonSearchTerm, gender !== 'all' ? gender : undefined);
-      console.log('Amazon products before setting state:', data);
-      console.log('Amazon products array type:', Array.isArray(data) ? 'Is Array' : 'Not Array');
-      console.log('Amazon products length:', data ? data.length : 'null/undefined');
+      // Always use the direct URL approach with pagination
+      const data = await productService.getAmazonProducts(
+        null, // No search term, use direct URL
+        gender !== 'all' ? gender : undefined,
+        amazonPage,
+        amazonDirectUrl
+      );
       
+      console.log(`Fetched Amazon products (page ${amazonPage})`, data);
       setAmazonProducts(Array.isArray(data) ? data : []);
-      console.log('Amazon products after setting state:', amazonProducts);
     } catch (error) {
       console.error('Error fetching Amazon products:', error);
       setAmazonProducts([]);
     } finally {
       setIsLoadingAmazon(false);
     }
-  }, [amazonSearchTerm, gender]);
+  }, [gender, amazonPage, amazonDirectUrl]);
   
   // Load initial data
   useEffect(() => {
@@ -90,16 +94,7 @@ const ProductsPage = () => {
     fetchAmazonProducts();
   }, [fetchAmazonProducts]);
   
-  // Handle Amazon search term change
-  const handleAmazonSearchChange = (event) => {
-    setAmazonSearchTerm(event.target.value);
-  };
-  
-  // Handle Amazon search submit
-  const handleAmazonSearchSubmit = (event) => {
-    event.preventDefault();
-    fetchAmazonProducts();
-  };
+  // No need for search handlers as we're using direct URL approach
 
   // Apply filters
   useEffect(() => {
@@ -322,38 +317,11 @@ const ProductsPage = () => {
               Amazon Products - Inners
             </Typography>
             
-            {/* Amazon Search Form */}
-            <Box component="form" onSubmit={handleAmazonSearchSubmit} sx={{ mb: 3, display: 'flex', gap: 1 }}>
-              <TextField
-                label="Search Amazon"
-                value={amazonSearchTerm}
-                onChange={handleAmazonSearchChange}
-                variant="outlined"
-                size="small"
-                sx={{ flexGrow: 1 }}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <SearchIcon color="primary" />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-              <Button 
-                type="submit" 
-                variant="contained" 
-                color="primary"
-                disabled={isLoadingAmazon}
-              >
-                Search
-              </Button>
-            </Box>
-            
             {isLoadingAmazon ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                 <CircularProgress />
               </Box>
-            ) : amazonProducts.length > 0 ? (
+            ) : amazonProducts.length > 0 && (
               <Grid container spacing={2}>
                 {amazonProducts.map((product, index) => (
                   <Grid item xs={12} sm={6} md={4} lg={3} key={`amazon-${product.id || index}`}>
@@ -484,268 +452,12 @@ const ProductsPage = () => {
                   </Grid>
                 ))}
               </Grid>
-            ) : (
-              <Paper sx={{ p: 4, textAlign: 'center' }}>
-                <Typography variant="body1">No Amazon products found</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Try changing your search term or try again later
-                </Typography>
-              </Paper>
-            )}
+            ) }
           </Paper>
         </Grid>
 
         {/* Products Grid */}
         <Grid item xs={12} md={9}>
-          <Box sx={{ mb: 3 }}>
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} sm={6}>
-                <Typography variant="h5">
-                  {gender === 'men' ? "Men's Innerwear" : 
-                   gender === 'women' ? "Women's Innerwear" : 
-                   "All Innerwear Products"}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {filteredProducts.length} products found
-                </Typography>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
-                  <TextField
-                    placeholder="Search products"
-                    size="small"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    sx={{ mr: 2, width: { xs: '100%', sm: '200px' } }}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <SearchIcon />
-                        </InputAdornment>
-                      ),
-                    }}
-                  />
-                  <FormControl size="small" sx={{ width: { xs: '100%', sm: '180px' } }}>
-                    <Select
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value)}
-                      displayEmpty
-                    >
-                      <MenuItem value="popularity">Popularity</MenuItem>
-                      <MenuItem value="price-low">Price: Low to High</MenuItem>
-                      <MenuItem value="price-high">Price: High to Low</MenuItem>
-                      <MenuItem value="rating">Rating</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Box>
-              </Grid>
-            </Grid>
-            
-            {/* Active Filters */}
-            {(selectedBrands.length > 0 || selectedTypes.length > 0 || selectedSources.length > 0 || searchTerm) && (
-              <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                {selectedBrands.map(brand => (
-                  <Chip 
-                    key={`brand-${brand}`}
-                    label={`Brand: ${brand}`}
-                    onDelete={() => handleBrandChange(brand)}
-                    size="small"
-                  />
-                ))}
-                {selectedTypes.map(type => (
-                  <Chip 
-                    key={`type-${type}`}
-                    label={`Type: ${type}`}
-                    onDelete={() => handleTypeChange(type)}
-                    size="small"
-                  />
-                ))}
-                {selectedSources.map(source => (
-                  <Chip 
-                    key={`source-${source}`}
-                    label={`Source: ${source}`}
-                    onDelete={() => handleSourceChange(source)}
-                    size="small"
-                  />
-                ))}
-                {searchTerm && (
-                  <Chip 
-                    label={`Search: ${searchTerm}`}
-                    onDelete={() => setSearchTerm('')}
-                    size="small"
-                  />
-                )}
-              </Box>
-            )}
-          </Box>
-          
-          {/* Compare bar if items are selected for comparison */}
-          {compareList.length > 0 && (
-            <Paper 
-              elevation={3} 
-              sx={{ 
-                p: 2, 
-                mb: 3, 
-                display: 'flex', 
-                justifyContent: 'space-between',
-                alignItems: 'center' 
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <Typography variant="subtitle1" sx={{ mr: 2 }}>
-                  {compareList.length} {compareList.length === 1 ? 'item' : 'items'} selected for comparison
-                </Typography>
-                {compareList.map(id => {
-                  const product = products.find(p => p.id === id);
-                  return (
-                    <Chip 
-                      key={id}
-                      label={product?.name}
-                      onDelete={() => handleToggleCompare(id)}
-                      size="small"
-                      sx={{ mr: 1 }}
-                    />
-                  );
-                })}
-              </Box>
-              <Button 
-                variant="contained"
-                color="primary"
-                startIcon={<CompareArrowsIcon />}
-                component="a"
-                href="/compare"
-              >
-                Compare
-              </Button>
-            </Paper>
-          )}
-          
-          {/* Product grid */}
-          {displayedProducts.length > 0 ? (
-            <Grid container spacing={3}>
-              {displayedProducts.map((product) => (
-                <Grid item key={product.id} xs={12} sm={6} md={4} lg={3}>
-                  <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    <Box sx={{ position: 'relative' }}>
-                      <CardMedia
-                        component="img"
-                        height="200"
-                        image={product.image}
-                        alt={product.name}
-                      />
-                      <Box
-                        sx={{
-                          position: 'absolute',
-                          top: 10,
-                          right: 10,
-                          display: 'flex',
-                          flexDirection: 'column',
-                        }}
-                      >
-                        <IconButton
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleToggleFavorite(product.id);
-                          }}
-                          sx={{
-                            bgcolor: 'rgba(255,255,255,0.8)',
-                            mb: 1,
-                            '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' },
-                          }}
-                          size="small"
-                        >
-                          {favorites.includes(product.id) ? (
-                            <FavoriteIcon color="error" />
-                          ) : (
-                            <FavoriteBorderIcon />
-                          )}
-                        </IconButton>
-                        <IconButton
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleToggleCompare(product.id);
-                          }}
-                          sx={{
-                            bgcolor: 'rgba(255,255,255,0.8)',
-                            '&:hover': { bgcolor: 'rgba(255,255,255,0.9)' },
-                          }}
-                          size="small"
-                        >
-                          <CompareArrowsIcon color={compareList.includes(product.id) ? 'primary' : 'inherit'} />
-                        </IconButton>
-                      </Box>
-                      <Box
-                        sx={{
-                          position: 'absolute',
-                          bottom: 0,
-                          left: 0,
-                          width: '100%',
-                          bgcolor: 'rgba(0, 0, 0, 0.54)',
-                          color: 'white',
-                          padding: '5px 10px',
-                        }}
-                      >
-                        <Typography variant="caption">
-                          via {product.source}
-                        </Typography>
-                      </Box>
-                    </Box>
-                    <CardContent sx={{ flexGrow: 1 }}>
-                      <Typography gutterBottom variant="h6" component="h3">
-                        {product.name}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" gutterBottom>
-                        {product.brand} • {product.type}
-                      </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                        <Rating value={product.rating} precision={0.1} size="small" readOnly />
-                        <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
-                          ({product.reviews})
-                        </Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Typography variant="h6" color="primary" sx={{ mr: 1 }}>
-                          ₹{product.price}
-                        </Typography>
-                        {product.originalPrice > product.price && (
-                          <>
-                            <Typography
-                              variant="body2"
-                              color="text.secondary"
-                              sx={{ textDecoration: 'line-through', mr: 1 }}
-                            >
-                              ₹{product.originalPrice}
-                            </Typography>
-                            <Typography variant="body2" color="error">
-                              {Math.round((1 - product.price / product.originalPrice) * 100)}% off
-                            </Typography>
-                          </>
-                        )}
-                      </Box>
-                    </CardContent>
-                    <Divider />
-                    <Box sx={{ p: 1 }}>
-                      <Button 
-                        variant="contained" 
-                        fullWidth
-                        size="small"
-                        href={`/products/${product.id}`}
-                      >
-                        View Details
-                      </Button>
-                    </Box>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          ) : (
-            <Paper sx={{ p: 4, textAlign: 'center' }}>
-              <Typography variant="h6">No products match your filters</Typography>
-              <Typography variant="body2" color="text.secondary">
-                Try changing your search criteria or clearing some filters
-              </Typography>
-            </Paper>
-          )}
           
           {/* Pagination */}
           {filteredProducts.length > 0 && (
@@ -755,6 +467,25 @@ const ProductsPage = () => {
                 page={page}
                 onChange={(e, value) => setPage(value)}
                 color="primary"
+              />
+            </Box>
+          )}
+          
+          {/* Amazon Products Pagination */}
+          {amazonProducts.length > 0 && (
+            <Box sx={{ mt: 4, mb: 2, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2 }}>
+              <Pagination 
+                count={10} /* Assuming 10 pages max - this could be dynamically set based on API response */
+                page={amazonPage}
+                onChange={(e, value) => {
+                  setAmazonPage(value);
+                  // Scroll to top for better UX
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                color="primary"
+                size="medium"
+                showFirstButton
+                showLastButton
               />
             </Box>
           )}

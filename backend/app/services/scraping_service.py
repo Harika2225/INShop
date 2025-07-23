@@ -43,14 +43,32 @@ def make_request(url: str, timeout: int = settings.REQUEST_TIMEOUT):
         print(f"Error fetching {url}: {e}")
         return None
 
-def scrape_amazon(query: str, gender: Optional[GenderEnum] = None, db: Session = None):
-    """Scrape Amazon for innerwear products using a robust implementation"""
-    # Build the search URL
-    search_term = f"{gender.value if gender else ''} innerwear {query}".strip()
-    encoded_search = search_term.replace(' ', '+')
-    url = f"{settings.AMAZON_URL}/s?k={encoded_search}"
+def scrape_amazon(query: str, gender: Optional[GenderEnum] = None, db: Session = None, page: int = 1, url: str = None):
+    """Scrape Amazon for innerwear products using a robust implementation
     
-    print(f"Scraping Amazon URL: {url}")
+    Args:
+        query: The search query string
+        gender: Optional gender filter
+        db: Database session
+        page: Page number for pagination (default: 1)
+        url: Direct URL to scrape (overrides query and page parameters if provided)
+    """
+    if url:
+        # Use provided URL directly (for custom category pages or direct product listings)
+        # If page parameter is provided, append it to the URL
+        if page > 1 and '&page=' not in url and '?page=' not in url:
+            url = f"{url}{'&' if '?' in url else '?'}page={page}"
+    else:
+        # Build the search URL from query parameters
+        search_term = f"{gender.value if gender else ''} innerwear {query}".strip()
+        encoded_search = search_term.replace(' ', '+')
+        url = f"{settings.AMAZON_URL}/s?k={encoded_search}"
+        
+        # Add page parameter for pagination
+        if page > 1:
+            url = f"{url}&page={page}"
+    
+    print(f"Scraping Amazon URL: {url} (Page {page})")
     
     # Set proper headers to avoid being blocked
     headers = {

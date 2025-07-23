@@ -35,11 +35,15 @@ const productService = {
   },
 
   // Get products from Amazon
-  async getAmazonProducts(query, gender) {
+  async getAmazonProducts(query, gender, page = 1, directUrl = null) {
     // Re-enabling this API call as requested for Amazon scraping
     try {
       const response = await api.get(`/api/v1/scraping/amazon/${query}`, {
-        params: { gender }
+        params: { 
+          gender, 
+          page,
+          url: directUrl  // Pass direct URL if provided
+        }
       });
       return response.data;
     } catch (error) {

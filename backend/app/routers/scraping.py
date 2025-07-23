@@ -216,15 +216,22 @@ async def refresh_product_data(
 async def search_amazon(
     query: str,
     gender: Optional[GenderEnum] = None,
+    page: int = 1,
+    url: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """
     Search Amazon for products matching the query.
+    
+    - query: The search query string
+    - gender: Optional gender filter (men, women, unisex)
+    - page: Page number for pagination (default: 1)
+    - url: Optional direct Amazon URL to scrape
     """
     # Call the scrape_amazon function to get products
     # We're updating the response model to Dict to avoid DB dependency
     try:
-        products = scrape_amazon(query, gender, db)
+        products = scrape_amazon(query=query, gender=gender, db=db, page=page, url=url)
         
         # Format the products for the response
         results = []
