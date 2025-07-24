@@ -150,20 +150,30 @@ const Header = () => {
             <MenuIcon />
           </IconButton>
           
-          <Typography
-            variant="h6"
-            noWrap
+          <Box
             component={RouterLink}
             to="/"
             sx={{ 
               flexGrow: 1, 
-              display: { xs: 'none', sm: 'block' },
+              display: { xs: 'none', sm: 'flex' },
               textDecoration: 'none',
-              color: 'inherit'
+              color: 'inherit',
+              alignItems: 'center'
             }}
           >
-            INShop
-          </Typography>
+            <Box 
+              component="img"
+              src="/INShop.png"
+              alt="INShop Logo"
+              sx={{ height: 80 }}
+            />
+            <Typography
+              variant="h6"
+              noWrap
+            >
+              INShop
+            </Typography>
+          </Box>
           
           <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'flex' } }}>
             <Button 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   Box,
@@ -14,19 +14,15 @@ import {
   Slider,
   Checkbox,
   FormControlLabel,
-  TextField,
-  InputAdornment,
   Pagination,
   Button,
   IconButton,
-  Chip,
   Divider,
   Paper,
   Rating,
   CircularProgress
 } from '@mui/material';
 import {
-  Search as SearchIcon,
   Favorite as FavoriteIcon,
   FavoriteBorder as FavoriteBorderIcon,
   CompareArrows as CompareArrowsIcon,
@@ -51,118 +47,72 @@ const ProductsPage = () => {
   const [selectedTypes, setSelectedTypes] = useState([]);
   const [selectedSources, setSelectedSources] = useState([]);
   const [priceRange, setPriceRange] = useState([0, 2000]);
-  const [sortBy, setSortBy] = useState('popularity');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [page, setPage] = useState(1);
-  const [products, setProducts] = useState([]);
-  const [filteredProducts, setFilteredProducts] = useState([]);
   const [favorites, setFavorites] = useState([]);
   const [compareList, setCompareList] = useState([]);
   const [amazonProducts, setAmazonProducts] = useState([]);
   const [isLoadingAmazon, setIsLoadingAmazon] = useState(false);
-  const amazonDirectUrl = 'https://www.amazon.in/s?i=apparel&rh=n%3A1968126031&s=popularity-rank&fs=true'; // Default to using the direct URL
-  const [amazonPage, setAmazonPage] = useState(1);
+  // URLs for both men's and women's innerwear - memoized to prevent useCallback dependencies issues
+  const amazonUrls = useMemo(() => ({
+    men: 'https://www.amazon.in/s?i=apparel&rh=n%3A1968126031&s=popularity-rank&fs=true', // Men's innerwear category
+    women: 'https://www.amazon.in/s?k=women+innerwear&i=apparel&s=relevance&fs=true' // Simple women's innerwear search
+  }), []);
+  // Get amazonPage from URL or default to 1
+  const amazonPageParam = parseInt(queryParams.get('amazonPage')) || 1;
+  const [amazonPage, setAmazonPage] = useState(amazonPageParam);
   
   // Fetch products from Amazon
   const fetchAmazonProducts = useCallback(async () => {
     try {
       setIsLoadingAmazon(true);
-      // Always use the direct URL approach with pagination
-      const data = await productService.getAmazonProducts(
-        null, // No search term, use direct URL
-        gender !== 'all' ? gender : undefined,
-        amazonPage,
-        amazonDirectUrl
-      );
+      let allProducts = [];
       
-      console.log(`Fetched Amazon products (page ${amazonPage})`, data);
-      setAmazonProducts(Array.isArray(data) ? data : []);
+      // Determine which URLs to fetch based on gender filter
+      const urlsToFetch = [];
+      if (gender === 'men' || gender === 'all') {
+        urlsToFetch.push({ gender: 'men', url: amazonUrls.men });
+      }
+      if (gender === 'women' || gender === 'all') {
+        urlsToFetch.push({ gender: 'women', url: amazonUrls.women });
+      }
+      
+      // Fetch products from each URL and combine results
+      for (const { gender: genderKey, url } of urlsToFetch) {
+        console.log(`Fetching Amazon products for gender: ${genderKey}, URL: ${url}`);
+        const data = await productService.getAmazonProducts(
+          null, // No search term, use direct URL
+          genderKey, // Pass the specific gender for this URL
+          amazonPage,
+          url
+        );
+        
+        console.log(`Received ${genderKey} data:`, data);
+        
+        if (Array.isArray(data)) {
+          allProducts = [...allProducts, ...data];
+        } else {
+          console.error(`Data for ${genderKey} is not an array:`, data);
+        }
+      }
+      
+      console.log(`Fetched Amazon products (page ${amazonPage}), total: ${allProducts.length}`, allProducts);
+      setAmazonProducts(allProducts);
     } catch (error) {
       console.error('Error fetching Amazon products:', error);
       setAmazonProducts([]);
     } finally {
       setIsLoadingAmazon(false);
     }
-  }, [gender, amazonPage, amazonDirectUrl]);
+  }, [gender, amazonPage, amazonUrls]);
   
   // Load initial data
   useEffect(() => {
-    // Initialize with empty array since database functionality is not in use as per requirement
-    setProducts([]);
-    
     // Fetch Amazon products on page load
     fetchAmazonProducts();
   }, [fetchAmazonProducts]);
   
   // No need for search handlers as we're using direct URL approach
 
-  // Apply filters
-  useEffect(() => {
-    let filtered = [...products];
-    
-    // Apply gender filter
-    if (gender !== 'all') {
-      filtered = filtered.filter(product => product.gender === gender);
-    }
-    
-    // Apply brand filter
-    if (selectedBrands.length > 0) {
-      filtered = filtered.filter(product => selectedBrands.includes(product.brand));
-    }
-    
-    // Apply type filter
-    if (selectedTypes.length > 0) {
-      filtered = filtered.filter(product => selectedTypes.includes(product.type));
-    }
-    
-    // Apply source filter
-    if (selectedSources.length > 0) {
-      filtered = filtered.filter(product => selectedSources.includes(product.source));
-    }
-    
-    // Apply price range filter
-    filtered = filtered.filter(
-      product => product.price >= priceRange[0] && product.price <= priceRange[1]
-    );
-    
-    // Apply search term filter
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(
-        product => 
-          product.name.toLowerCase().includes(term) || 
-          product.brand.toLowerCase().includes(term) ||
-          product.type.toLowerCase().includes(term)
-      );
-    }
-    
-    // Apply sorting
-    switch(sortBy) {
-      case 'price-low':
-        filtered.sort((a, b) => a.price - b.price);
-        break;
-      case 'price-high':
-        filtered.sort((a, b) => b.price - a.price);
-        break;
-      case 'rating':
-        filtered.sort((a, b) => b.rating - a.rating);
-        break;
-      case 'popularity':
-      default:
-        filtered.sort((a, b) => b.reviews - a.reviews);
-        break;
-    }
-    
-    setFilteredProducts(filtered);
-  }, [products, gender, selectedBrands, selectedTypes, selectedSources, priceRange, sortBy, searchTerm]);
-  
-  // Handle pagination
-  const productsPerPage = 8;
-  const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
-  const displayedProducts = filteredProducts.slice(
-    (page - 1) * productsPerPage, 
-    page * productsPerPage
-  );
+
 
   // Handle toggle favorite
   const handleToggleFavorite = (productId) => {
@@ -186,23 +136,7 @@ const ProductsPage = () => {
     }
   };
   
-  // Handle filter change for brands
-  const handleBrandChange = (brand) => {
-    if (selectedBrands.includes(brand)) {
-      setSelectedBrands(selectedBrands.filter(b => b !== brand));
-    } else {
-      setSelectedBrands([...selectedBrands, brand]);
-    }
-  };
-  
-  // Handle filter change for types
-  const handleTypeChange = (type) => {
-    if (selectedTypes.includes(type)) {
-      setSelectedTypes(selectedTypes.filter(t => t !== type));
-    } else {
-      setSelectedTypes([...selectedTypes, type]);
-    }
-  };
+
   
   // Handle filter change for sources
   const handleSourceChange = (source) => {
@@ -301,7 +235,6 @@ const ProductsPage = () => {
                 setSelectedTypes([]);
                 setSelectedSources([]);
                 setPriceRange([0, 2000]);
-                setSearchTerm('');
               }}
             >
               Clear All Filters
@@ -456,29 +389,20 @@ const ProductsPage = () => {
           </Paper>
         </Grid>
 
-        {/* Products Grid */}
+        {/* Amazon Products Pagination */}
         <Grid item xs={12} md={9}>
-          
-          {/* Pagination */}
-          {filteredProducts.length > 0 && (
-            <Box sx={{ mt: 4, display: 'flex', justifyContent: 'center' }}>
-              <Pagination 
-                count={totalPages} 
-                page={page}
-                onChange={(e, value) => setPage(value)}
-                color="primary"
-              />
-            </Box>
-          )}
-          
-          {/* Amazon Products Pagination */}
           {amazonProducts.length > 0 && (
             <Box sx={{ mt: 4, mb: 2, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2 }}>
               <Pagination 
-                count={10} /* Assuming 10 pages max - this could be dynamically set based on API response */
+                count={400} 
                 page={amazonPage}
                 onChange={(e, value) => {
                   setAmazonPage(value);
+                  // Update URL with new page number for persistence across reloads
+                  const newParams = new URLSearchParams(window.location.search);
+                  newParams.set('amazonPage', value);
+                  // Update URL without full page reload
+                  window.history.pushState({}, '', `${window.location.pathname}?${newParams}`);
                   // Scroll to top for better UX
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}

@@ -53,6 +53,16 @@ def scrape_amazon(query: str, gender: Optional[GenderEnum] = None, db: Session =
         page: Page number for pagination (default: 1)
         url: Direct URL to scrape (overrides query and page parameters if provided)
     """
+    print(f"Scraping with gender: {gender}, query: {query}, page: {page}, url: {url}")
+    
+    # Ensure gender is respected even with direct URL by modifying search URL if needed
+    if gender and gender.value == 'women' and url and 'women' not in url.lower():
+        # If we have a direct URL but it doesn't contain 'women', inject it for women
+        if '?' in url:
+            url = f"{url}&k=women+innerwear"
+        else:
+            url = f"{url}?k=women+innerwear"
+        print(f"Modified URL for women's products: {url}")
     if url:
         # Use provided URL directly (for custom category pages or direct product listings)
         # If page parameter is provided, append it to the URL
@@ -101,26 +111,7 @@ def scrape_amazon(query: str, gender: Optional[GenderEnum] = None, db: Session =
     
     products = []
     
-    # Generate mock products if no results or scraping is blocked
-    if len(product_containers) == 0:
-        print("No product containers found, generating mock data")
-        # Generate 10 mock products for demonstration
-        for i in range(1, 11):
-            product_data = {
-                "id": f"MOCK{i:03d}",
-                "name": f"Inner Wear Product {i}",
-                "brand": "Sample Brand",
-                "gender": gender.value if gender else "unisex",
-                "type": "Innerwear",
-                "price": 499.99 + (i * 10),
-                "original_price": 699.99 + (i * 10),
-                "source": "Amazon",
-                "source_url": f"https://www.amazon.in/dp/MOCK{i:03d}",
-                "image": f"https://placehold.co/400x400/007bff/ffffff?text=Inner+Wear+{i}",
-                "rating": 4.0 + (i % 10) / 10
-            }
-            products.append(product_data)
-        return products
+  
     
     # Process each product container
     for idx, container in enumerate(product_containers):
