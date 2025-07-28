@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   Container,
@@ -12,97 +12,156 @@ import {
   Select,
   MenuItem,
   Slider,
-  Checkbox,
-  FormControlLabel,
+
   Pagination,
   Button,
   IconButton,
   Divider,
   Paper,
   Rating,
-  CircularProgress
+  CircularProgress,
+  TextField,
+  InputAdornment
 } from '@mui/material';
 import {
   Favorite as FavoriteIcon,
   FavoriteBorder as FavoriteBorderIcon,
   CompareArrows as CompareArrowsIcon,
   FilterAlt as FilterAltIcon,
-  Launch as LaunchIcon
+  Launch as LaunchIcon,
+  Search as SearchIcon
 } from '@mui/icons-material';
 import productService from '../services/productService';
 
 // No static product data - all data is fetched from APIs
 
 // Dynamic lists will be populated from API data
-const sources = ['Amazon']; // Only Amazon source is active per requirements
 
 const ProductsPage = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const queryParams = new URLSearchParams(location.search);
   const genderParam = queryParams.get('gender');
   
   // State for filters
   const [gender, setGender] = useState(genderParam || 'all');
-  const [selectedBrands, setSelectedBrands] = useState([]);
-  const [selectedTypes, setSelectedTypes] = useState([]);
-  const [selectedSources, setSelectedSources] = useState([]);
   const [priceRange, setPriceRange] = useState([0, 2000]);
   const [favorites, setFavorites] = useState([]);
   const [compareList, setCompareList] = useState([]);
   const [amazonProducts, setAmazonProducts] = useState([]);
   const [isLoadingAmazon, setIsLoadingAmazon] = useState(false);
-  // URLs for both men's and women's innerwear - memoized to prevent useCallback dependencies issues
-  const amazonUrls = useMemo(() => ({
-    men: 'https://www.amazon.in/s?i=apparel&rh=n%3A1968126031&s=popularity-rank&fs=true', // Men's innerwear category
-    women: 'https://www.amazon.in/s?k=women+innerwear&i=apparel&s=relevance&fs=true' // Simple women's innerwear search
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentSearchTerm, setCurrentSearchTerm] = useState('');
+  // Default search terms for when no search query is provided
+  const defaultSearchTerms = useMemo(() => ({
+    men: 'men innerwear',
+    women: 'women innerwear'
   }), []);
   // Get amazonPage from URL or default to 1
   const amazonPageParam = parseInt(queryParams.get('amazonPage')) || 1;
   const [amazonPage, setAmazonPage] = useState(amazonPageParam);
   
+  // Shuffle array function helper
+  const shuffleArray = (array) => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  };
+
   // Fetch products from Amazon
   const fetchAmazonProducts = useCallback(async () => {
     try {
       setIsLoadingAmazon(true);
-      let allProducts = [];
+      const menProducts = [];
+      const womenProducts = [];
       
-      // Determine which URLs to fetch based on gender filter
-      const urlsToFetch = [];
-      if (gender === 'men' || gender === 'all') {
-        urlsToFetch.push({ gender: 'men', url: amazonUrls.men });
-      }
-      if (gender === 'women' || gender === 'all') {
-        urlsToFetch.push({ gender: 'women', url: amazonUrls.women });
-      }
+      // Determine which genders to fetch based on gender filter
+      const fetchMen = gender === 'men' || gender === 'all';
+      const fetchWomen = gender === 'women' || gender === 'all';
       
-      // Fetch products from each URL and combine results
-      for (const { gender: genderKey, url } of urlsToFetch) {
-        console.log(`Fetching Amazon products for gender: ${genderKey}, URL: ${url}`);
-        const data = await productService.getAmazonProducts(
-          null, // No search term, use direct URL
-          genderKey, // Pass the specific gender for this URL
+      // Determine search term to use
+      const searchTerm = currentSearchTerm.trim();
+      
+      // Fetch men's products if needed
+      if (fetchMen) {
+        const menSearchTerm = searchTerm || defaultSearchTerms.men;
+        console.log(`Fetching Amazon products for gender: men, search term: ${menSearchTerm}`);
+        const menData = await productService.getAmazonProducts(
+          menSearchTerm, // Use dynamic search term
+          'men', // Pass the specific gender
           amazonPage,
-          url
+          null // No direct URL, use search term instead
         );
         
-        console.log(`Received ${genderKey} data:`, data);
-        
-        if (Array.isArray(data)) {
-          allProducts = [...allProducts, ...data];
+        if (Array.isArray(menData)) {
+          // Tag each product with gender='men' to help with filtering
+          const taggedMenData = menData.map(product => ({
+            ...product,
+            gender: 'men'
+          }));
+          menProducts.push(...taggedMenData);
+          console.log(`Received men's data: ${taggedMenData.length} products`);
         } else {
-          console.error(`Data for ${genderKey} is not an array:`, data);
+          console.error(`Data for men is not an array:`, menData);
         }
       }
       
-      console.log(`Fetched Amazon products (page ${amazonPage}), total: ${allProducts.length}`, allProducts);
-      setAmazonProducts(allProducts);
+      // Fetch women's products if needed
+      if (fetchWomen) {
+        const womenSearchTerm = searchTerm || defaultSearchTerms.women;
+        console.log(`Fetching Amazon products for gender: women, search term: ${womenSearchTerm}`);
+        const womenData = await productService.getAmazonProducts(
+          womenSearchTerm, // Use dynamic search term
+          'women', // Pass the specific gender
+          amazonPage,
+          null // No direct URL, use search term instead
+        );
+        
+        if (Array.isArray(womenData)) {
+          // Tag each product with gender='women' to help with filtering
+          const taggedWomenData = womenData.map(product => ({
+            ...product,
+            gender: 'women'
+          }));
+          womenProducts.push(...taggedWomenData);
+          console.log(`Received women's data: ${taggedWomenData.length} products`);
+        } else {
+          console.error(`Data for women is not an array:`, womenData);
+        }
+      }
+      
+      // Limit to 25 products from each gender if available
+      const limitedMenProducts = menProducts.slice(0, 25);
+      const limitedWomenProducts = womenProducts.slice(0, 25);
+      
+      // Combine and shuffle products
+      let finalProducts = [];
+      if (gender === 'men') {
+        finalProducts = limitedMenProducts;
+      } else if (gender === 'women') {
+        finalProducts = limitedWomenProducts;
+      } else {
+        // Interleave men and women products for better mixing when shuffled
+        for (let i = 0; i < Math.max(limitedMenProducts.length, limitedWomenProducts.length); i++) {
+          if (i < limitedMenProducts.length) finalProducts.push(limitedMenProducts[i]);
+          if (i < limitedWomenProducts.length) finalProducts.push(limitedWomenProducts[i]);
+        }
+        // Shuffle the results for better mixing
+        finalProducts = shuffleArray(finalProducts);
+      }
+      
+      console.log(`Displaying ${finalProducts.length} Amazon products (limited to max 50 - up to 25 men and 25 women)`);
+      setAmazonProducts(finalProducts);
     } catch (error) {
       console.error('Error fetching Amazon products:', error);
       setAmazonProducts([]);
     } finally {
       setIsLoadingAmazon(false);
     }
-  }, [gender, amazonPage, amazonUrls]);
+  }, [gender, amazonPage, currentSearchTerm, defaultSearchTerms]);
   
   // Load initial data
   useEffect(() => {
@@ -110,10 +169,19 @@ const ProductsPage = () => {
     fetchAmazonProducts();
   }, [fetchAmazonProducts]);
   
-  // No need for search handlers as we're using direct URL approach
-
-
-
+  // Handle search submission
+  const handleSearch = () => {
+    setCurrentSearchTerm(searchQuery);
+    setAmazonPage(1); // Reset to page 1 when searching
+    
+    // Update URL with new search term for persistence across reloads
+    const newParams = new URLSearchParams(window.location.search);
+    newParams.set('search', searchQuery);
+    newParams.set('amazonPage', 1);
+    // Update URL without full page reload
+    window.history.pushState({}, '', `${window.location.pathname}?${newParams}`);
+  };
+  
   // Handle toggle favorite
   const handleToggleFavorite = (productId) => {
     if (favorites.includes(productId)) {
@@ -138,20 +206,34 @@ const ProductsPage = () => {
   
 
   
-  // Handle filter change for sources
-  const handleSourceChange = (source) => {
-    if (selectedSources.includes(source)) {
-      setSelectedSources(selectedSources.filter(s => s !== source));
-    } else {
-      setSelectedSources([...selectedSources, source]);
-    }
-  };
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Grid container spacing={3}>
         {/* Filters Sidebar */}
         <Grid item xs={12} md={3}>
+          {/* Search Bar */}
+          <Box sx={{ p: 2, mb: 2 }}>
+            <TextField
+              fullWidth
+              variant="outlined"
+              label="Search Products"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton onClick={handleSearch} edge="end">
+                      <SearchIcon />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Box>
+
+          {/* Filter UI Components - Left Sidebar */}
           <Paper elevation={1} sx={{ p: 2, mb: 2 }}>
             <Typography variant="h6" gutterBottom>
               Filters
@@ -164,7 +246,23 @@ const ProductsPage = () => {
               <FormControl fullWidth size="small">
                 <Select
                   value={gender}
-                  onChange={(e) => setGender(e.target.value)}
+                  onChange={(e) => {
+                    const newGender = e.target.value;
+                    setGender(newGender);
+                    
+                    // Update URL based on gender selection
+                    const newParams = new URLSearchParams(location.search);
+                    if (newGender === 'all') {
+                      // Remove gender parameter when 'All' is selected
+                      newParams.delete('gender');
+                    } else {
+                      // Set gender parameter for men or women
+                      newParams.set('gender', newGender);
+                    }
+                    
+                    // Update URL without reloading the page
+                    navigate(`/products?${newParams.toString()}`, { replace: true });
+                  }}
                   displayEmpty
                 >
                   <MenuItem value="all">All</MenuItem>
@@ -179,11 +277,33 @@ const ProductsPage = () => {
               <Typography variant="subtitle1" gutterBottom>Price Range</Typography>
               <Slider
                 value={priceRange}
-                onChange={(e, newValue) => setPriceRange(newValue)}
+                onChange={(e, newValue, activeThumb) => {
+                  // If activeThumb is 0, user is changing min value
+                  // If activeThumb is 1 or undefined, user is changing max value
+                  const updatedRange = [...priceRange];
+                  
+                  if (activeThumb === 0) {
+                    // Explicitly changing minimum
+                    updatedRange[0] = newValue[0];
+                    updatedRange[1] = Math.max(updatedRange[1], newValue[0]); // Ensure max >= min
+                  } else {
+                    // By default, adjust the maximum
+                    updatedRange[1] = newValue[1];
+                    // Keep the minimum as is
+                  }
+                  
+                  setPriceRange(updatedRange);
+                  
+                  // Update URL with price range
+                  const newParams = new URLSearchParams(location.search);
+                  newParams.set('minPrice', updatedRange[0]);
+                  newParams.set('maxPrice', updatedRange[1]);
+                  navigate(`/products?${newParams.toString()}`, { replace: true });
+                }}
                 valueLabelDisplay="auto"
                 min={0}
                 max={2000}
-                step={100}
+                step={50}
               />
               <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Typography variant="body2">₹{priceRange[0]}</Typography>
@@ -207,33 +327,11 @@ const ProductsPage = () => {
               </Box>
             </Box>
             
-            {/* Source Filter */}
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle1" gutterBottom>Source</Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                {sources.map((source) => (
-                  <FormControlLabel
-                    key={source}
-                    control={
-                      <Checkbox 
-                        checked={selectedSources.includes(source)}
-                        onChange={() => handleSourceChange(source)}
-                        size="small"
-                      />
-                    }
-                    label={source}
-                  />
-                ))}
-              </Box>
-            </Box>
             
             <Button 
               variant="outlined" 
               fullWidth
               onClick={() => {
-                setSelectedBrands([]);
-                setSelectedTypes([]);
-                setSelectedSources([]);
                 setPriceRange([0, 2000]);
               }}
             >
@@ -255,8 +353,20 @@ const ProductsPage = () => {
                 <CircularProgress />
               </Box>
             ) : amazonProducts.length > 0 && (
-              <Grid container spacing={2}>
-                {amazonProducts.map((product, index) => (
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
+                  Showing {Math.min(amazonProducts.length, 50)} products {gender !== 'all' ? `(${gender}'s only)` : ''}
+                </Typography>
+                <Grid container spacing={2}>
+                {/* Limit displayed products to 50 and filter by price */}
+                {amazonProducts
+                  .filter(product => {
+                    // Apply price filter
+                    const price = Number(product.price);
+                    return (!isNaN(price) && price >= priceRange[0] && price <= priceRange[1]);
+                  })
+                  .slice(0, 50)
+                  .map((product, index) => (
                   <Grid item xs={12} sm={6} md={4} lg={3} key={`amazon-${product.id || index}`}>
                     <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
                       <Box sx={{ position: 'relative' }}>
@@ -385,6 +495,7 @@ const ProductsPage = () => {
                   </Grid>
                 ))}
               </Grid>
+              </Box>
             ) }
           </Paper>
         </Grid>
