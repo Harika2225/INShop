@@ -49,9 +49,12 @@ const ProductsPage = () => {
   const [favorites, setFavorites] = useState([]);
   const [compareList, setCompareList] = useState([]);
   const [amazonProducts, setAmazonProducts] = useState([]);
+  const [flipkartProducts, setFlipkartProducts] = useState([]);
   const [isLoadingAmazon, setIsLoadingAmazon] = useState(false);
+  const [isLoadingFlipkart, setIsLoadingFlipkart] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentSearchTerm, setCurrentSearchTerm] = useState('');
+  const [failedImages, setFailedImages] = useState(new Set());
   // Default search terms for when no search query is provided
   const defaultSearchTerms = useMemo(() => ({
     men: 'men innerwear',
@@ -103,9 +106,6 @@ const ProductsPage = () => {
             gender: 'men'
           }));
           menProducts.push(...taggedMenData);
-          console.log(`Received men's data: ${taggedMenData.length} products`);
-        } else {
-          console.error(`Data for men is not an array:`, menData);
         }
       }
       
@@ -127,34 +127,14 @@ const ProductsPage = () => {
             gender: 'women'
           }));
           womenProducts.push(...taggedWomenData);
-          console.log(`Received women's data: ${taggedWomenData.length} products`);
-        } else {
-          console.error(`Data for women is not an array:`, womenData);
         }
       }
-      
-      // Limit to 25 products from each gender if available
-      const limitedMenProducts = menProducts.slice(0, 25);
-      const limitedWomenProducts = womenProducts.slice(0, 25);
       
       // Combine and shuffle products
-      let finalProducts = [];
-      if (gender === 'men') {
-        finalProducts = limitedMenProducts;
-      } else if (gender === 'women') {
-        finalProducts = limitedWomenProducts;
-      } else {
-        // Interleave men and women products for better mixing when shuffled
-        for (let i = 0; i < Math.max(limitedMenProducts.length, limitedWomenProducts.length); i++) {
-          if (i < limitedMenProducts.length) finalProducts.push(limitedMenProducts[i]);
-          if (i < limitedWomenProducts.length) finalProducts.push(limitedWomenProducts[i]);
-        }
-        // Shuffle the results for better mixing
-        finalProducts = shuffleArray(finalProducts);
-      }
+      const allProducts = [...menProducts, ...womenProducts];
+      const shuffledProducts = shuffleArray(allProducts);
       
-      console.log(`Displaying ${finalProducts.length} Amazon products (limited to max 50 - up to 25 men and 25 women)`);
-      setAmazonProducts(finalProducts);
+      setAmazonProducts(shuffledProducts);
     } catch (error) {
       console.error('Error fetching Amazon products:', error);
       setAmazonProducts([]);
@@ -162,12 +142,139 @@ const ProductsPage = () => {
       setIsLoadingAmazon(false);
     }
   }, [gender, amazonPage, currentSearchTerm, defaultSearchTerms]);
+
+  // Fetch products from Flipkart
+  const fetchFlipkartProducts = useCallback(async () => {
+    try {
+      setIsLoadingFlipkart(true);
+      const menProducts = [];
+      const womenProducts = [];
+      
+      // Determine which genders to fetch based on gender filter
+      const fetchMen = gender === 'men' || gender === 'all';
+      const fetchWomen = gender === 'women' || gender === 'all';
+      
+      // Determine search term to use
+      const searchTerm = currentSearchTerm.trim();
+      
+      // Fetch men's products if needed
+      if (fetchMen) {
+        const menSearchTerm = searchTerm || defaultSearchTerms.men;
+        console.log(`Fetching Flipkart products for gender: men, search term: ${menSearchTerm}`);
+        const menData = await productService.getFlipkartProducts(
+          menSearchTerm, // Use dynamic search term
+          'men' // Pass the specific gender
+        );
+        
+        if (Array.isArray(menData)) {
+          // Tag each product with gender='men' to help with filtering
+          const taggedMenData = menData.map(product => ({
+            ...product,
+            gender: 'men'
+          }));
+          menProducts.push(...taggedMenData);
+        }
+      }
+      
+      // Fetch women's products if needed
+      if (fetchWomen) {
+        const womenSearchTerm = searchTerm || defaultSearchTerms.women;
+        console.log(`Fetching Flipkart products for gender: women, search term: ${womenSearchTerm}`);
+        const womenData = await productService.getFlipkartProducts(
+          womenSearchTerm, // Use dynamic search term
+          'women' // Pass the specific gender
+        );
+        
+        if (Array.isArray(womenData)) {
+          // Tag each product with gender='women' to help with filtering
+          const taggedWomenData = womenData.map(product => ({
+            ...product,
+            gender: 'women'
+          }));
+          womenProducts.push(...taggedWomenData);
+        }
+      }
+      
+      // Combine and shuffle products
+      const allProducts = [...menProducts, ...womenProducts];
+      const shuffledProducts = shuffleArray(allProducts);
+      
+      setFlipkartProducts(shuffledProducts);
+    } catch (error) {
+      console.error('Error fetching Flipkart products:', error);
+      setFlipkartProducts([]);
+    } finally {
+      setIsLoadingFlipkart(false);
+    }
+  }, [gender, currentSearchTerm, defaultSearchTerms]);
   
+  // Validate product URL
+  const validateProductUrl = (product) => {
+    const url = product.source_url || product.url;
+    if (!url) return false;
+    
+    // Check if URL is valid
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // Handle image error
+  const handleImageError = (event, product) => {
+    const target = event.target;
+    
+    // Track this image as failed
+    setFailedImages(prev => new Set(prev).add(product.id));
+    
+    // Provide source-specific fallback images with better text
+    if (product.source === 'Flipkart') {
+      const productName = product.name ? product.name.slice(0, 10) : 'Product';
+      target.src = `https://placehold.co/400x400/2874f0/ffffff?text=${encodeURIComponent(productName)}`;
+    } else if (product.source === 'Amazon') {
+      const productName = product.name ? product.name.slice(0, 10) : 'Product';
+      target.src = `https://placehold.co/400x400/ff9900/ffffff?text=${encodeURIComponent(productName)}`;
+    } else {
+      const productName = product.name ? product.name.slice(0, 10) : 'Product';
+      target.src = `https://placehold.co/400x400/cccccc/333333?text=${encodeURIComponent(productName)}`;
+    }
+    
+    target.onerror = null; // Prevent infinite loop
+  };
+
   // Load initial data
   useEffect(() => {
     // Fetch Amazon products on page load
     fetchAmazonProducts();
-  }, [fetchAmazonProducts]);
+    // Fetch Flipkart products on page load
+    fetchFlipkartProducts();
+  }, [fetchAmazonProducts, fetchFlipkartProducts]);
+
+  // Create combined products array with 50/50 distribution
+  const combinedProducts = useMemo(() => {
+    const amazonCount = Math.min(amazonProducts.length, 25); // Limit to 25 Amazon products
+    const flipkartCount = Math.min(flipkartProducts.length, 25); // Limit to 25 Flipkart products
+    
+    const amazonSlice = amazonProducts.slice(0, amazonCount);
+    const flipkartSlice = flipkartProducts.slice(0, flipkartCount);
+    
+    // Interleave products for 50/50 distribution
+    const combined = [];
+    const maxLength = Math.max(amazonSlice.length, flipkartSlice.length);
+    
+    for (let i = 0; i < maxLength; i++) {
+      if (i < amazonSlice.length) {
+        combined.push(amazonSlice[i]);
+      }
+      if (i < flipkartSlice.length) {
+        combined.push(flipkartSlice[i]);
+      }
+    }
+    
+    return shuffleArray(combined);
+  }, [amazonProducts, flipkartProducts]);
   
   // Handle search submission
   const handleSearch = () => {
@@ -180,6 +287,10 @@ const ProductsPage = () => {
     newParams.set('amazonPage', 1);
     // Update URL without full page reload
     window.history.pushState({}, '', `${window.location.pathname}?${newParams}`);
+    
+    // Fetch products from both sources
+    fetchAmazonProducts();
+    fetchFlipkartProducts();
   };
   
   // Handle toggle favorite
@@ -342,39 +453,50 @@ const ProductsPage = () => {
         
         {/* Main Content */}
         <Grid item xs={12} md={9}>
-          {/* Amazon Products Section */}
+          {/* Combined Products Section */}
           <Paper sx={{ p: 3, mb: 3 }}>
             <Typography variant="h5" component="h2" gutterBottom>
-              Amazon Products - Inners
+              Products - Amazon & Flipkart
             </Typography>
             
-            {isLoadingAmazon ? (
+            {(isLoadingAmazon || isLoadingFlipkart) ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                 <CircularProgress />
               </Box>
-            ) : amazonProducts.length > 0 && (
+            ) : combinedProducts.length > 0 && (
               <Box>
                 <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
-                  Showing {Math.min(amazonProducts.length, 50)} products {gender !== 'all' ? `(${gender}'s only)` : ''}
+                  Showing {combinedProducts.length} products from Amazon and Flipkart {gender !== 'all' ? `(${gender}'s only)` : ''}
                 </Typography>
                 <Grid container spacing={2}>
-                {/* Limit displayed products to 50 and filter by price */}
-                {amazonProducts
+                {/* Filter by price and display combined products */}
+                {combinedProducts
                   .filter(product => {
                     // Apply price filter
                     const price = Number(product.price);
                     return (!isNaN(price) && price >= priceRange[0] && price <= priceRange[1]);
                   })
-                  .slice(0, 50)
                   .map((product, index) => (
-                  <Grid item xs={12} sm={6} md={4} lg={3} key={`amazon-${product.id || index}`}>
+                  <Grid item xs={12} sm={6} md={4} lg={3} key={`${product.source}-${product.id}-${index}`}>
                     <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
                       <Box sx={{ position: 'relative' }}>
                         <CardMedia
                           component="img"
                           height="200"
-                          image={product.image && product.image !== '' ? product.image : `https://via.placeholder.com/300x300/cccccc/333333?text=${encodeURIComponent('Product')}`}
+                          image={
+                            product.image && 
+                            product.image !== '' && 
+                            !product.image.startsWith('data:') &&
+                            !failedImages.has(product.id) 
+                              ? product.image 
+                              : product.source === 'Flipkart'
+                                ? `https://placehold.co/400x400/2874f0/ffffff?text=${encodeURIComponent(product.name ? product.name.slice(0, 15) : 'Flipkart Product')}`
+                                : product.source === 'Amazon'
+                                  ? `https://placehold.co/400x400/ff9900/ffffff?text=${encodeURIComponent(product.name ? product.name.slice(0, 15) : 'Amazon Product')}`
+                                  : `https://placehold.co/400x400/cccccc/333333?text=${encodeURIComponent(product.name ? product.name.slice(0, 15) : 'Product')}`
+                          }
                           alt={product.name || 'Product'}
+                          onError={(e) => handleImageError(e, product)}
                         />
                         {/* Favorite and Compare buttons */}
                         <Box
@@ -431,12 +553,13 @@ const ProductsPage = () => {
                             via {product.source}
                           </Typography>
                           <IconButton
-                            href={product.url}
+                            href={validateProductUrl(product) ? (product.source_url || product.url) : undefined}
                             target="_blank"
                             rel="noopener noreferrer"
                             size="small"
                             sx={{ color: 'white' }}
-                            aria-label="Go to Amazon"
+                            aria-label={`Go to ${product.source}`}
+                            disabled={!validateProductUrl(product)}
                           >
                             <LaunchIcon fontSize="small" />
                           </IconButton>
@@ -483,12 +606,13 @@ const ProductsPage = () => {
                           variant="outlined" 
                           fullWidth
                           size="small"
-                          href={product.url}
+                          href={validateProductUrl(product) ? (product.source_url || product.url) : undefined}
                           target="_blank"
                           rel="noopener noreferrer"
                           startIcon={<LaunchIcon />}
+                          disabled={!validateProductUrl(product)}
                         >
-                          View on Amazon
+                          View on {product.source}
                         </Button>
                       </Box>
                     </Card>
@@ -500,9 +624,9 @@ const ProductsPage = () => {
           </Paper>
         </Grid>
 
-        {/* Amazon Products Pagination */}
+        {/* Pagination */}
         <Grid item xs={12} md={9}>
-          {amazonProducts.length > 0 && (
+          {combinedProducts.length > 0 && (
             <Box sx={{ mt: 4, mb: 2, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2 }}>
               <Pagination 
                 count={400} 

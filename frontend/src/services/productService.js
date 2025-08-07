@@ -54,12 +54,15 @@ const productService = {
 
   // Get products from Flipkart
   async getFlipkartProducts(query, gender) {
-    // Database functionality commented out as per requirement
-    // const response = await api.get(`/api/v1/scraping/flipkart/${query}`, {
-    //   params: { gender }
-    // });
-    // return response.data;
-    return []; // Return empty array while database is not in use
+    try {
+      const response = await api.get(`/api/v1/scraping/flipkart/${query}`, {
+        params: { gender }
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching Flipkart products:', error);
+      return []; // Return empty array on error
+    }
   },
 
   // Get products from Myntra

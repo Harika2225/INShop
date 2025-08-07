@@ -258,7 +258,7 @@ async def search_amazon(
         # Return empty list on error
         return []
 
-@router.get("/flipkart/{query}", response_model=List[ProductListResponse])
+@router.get("/flipkart/{query}", response_model=List[Dict[str, Any]])
 async def search_flipkart(
     query: str,
     gender: Optional[GenderEnum] = None,
@@ -266,9 +266,38 @@ async def search_flipkart(
 ):
     """
     Search Flipkart for products matching the query.
+    
+    - query: The search query string
+    - gender: Optional gender filter (men, women, unisex)
     """
-    # In a real implementation, this would call the scrape_flipkart function
-    return []
+    # Call the scrape_flipkart function to get products
+    try:
+        products = scrape_flipkart(query=query, gender=gender, db=db)
+        
+        # Format the products for the response
+        results = []
+        for product in products:
+            # Transform product object to dict
+            results.append({
+                "id": product.get("id", ""),
+                "name": product.get("name", ""),
+                "brand": product.get("brand", ""),
+                "price": product.get("price", 0),
+                "original_price": product.get("original_price", 0),
+                "image": product.get("image", ""),
+                "source": "Flipkart",
+                "url": product.get("source_url", ""),
+                "type": product.get("type", ""),
+                "rating": product.get("rating", 0),
+                "reviews_count": product.get("rating_count", 0)
+            })
+        
+        return results
+    except Exception as e:
+        # Log the error
+        print(f"Error scraping Flipkart: {e}")
+        # Return empty list on error
+        return []
 
 @router.get("/myntra/{query}", response_model=List[ProductListResponse])
 async def search_myntra(
