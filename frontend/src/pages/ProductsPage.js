@@ -576,7 +576,7 @@ const ProductsPage = () => {
                           <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                             <Rating value={product.rating} precision={0.1} size="small" readOnly />
                             <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
-                              ({product.reviews_count || 0})
+                              ({product.rating_count || 0})
                             </Typography>
                           </Box>
                         )}

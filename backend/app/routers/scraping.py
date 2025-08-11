@@ -248,7 +248,7 @@ async def search_amazon(
                 "url": product.get("source_url", ""),
                 "type": product.get("type", ""),
                 "rating": product.get("rating", 0),
-                "reviews_count": product.get("reviews", 0)
+                "rating_count": product.get("rating_count", 0)
             })
         
         return results
@@ -289,7 +289,7 @@ async def search_flipkart(
                 "url": product.get("source_url", ""),
                 "type": product.get("type", ""),
                 "rating": product.get("rating", 0),
-                "reviews_count": product.get("rating_count", 0)
+                "rating_count": product.get("rating_count", 0)
             })
         
         return results
